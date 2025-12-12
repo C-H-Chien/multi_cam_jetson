@@ -1,4 +1,5 @@
-# sudo python3 ./arducam_pair_displayer.py -f GREY -d0 0 -d1 1 --fps
+# $ sudo python3 ./arducam_pair_displayer.py -f GREY -d0 0 -d1 1 --fps
+# $ sudo python3 ./arducam_pair_displayer.py -f GREY -d0 0 -d1 1 --fps --cap_video
 
 try:
     import cv2
@@ -13,6 +14,10 @@ import fcntl
 import os
 import argparse
 import keyboard
+import subprocess
+import gi
+gi.require_version("Gst", "1.0")
+from gi.repository import Gst, GLib
 try:
     from utils import ArducamUtils
 except ImportError as e:
@@ -43,15 +48,36 @@ except ImportError as e:
 import time
 import sys
 
-def resize(frame, dst_width):
-    width = frame.shape[1]
-    height = frame.shape[0]
-    scale = dst_width * 1.0 / width
-    return cv2.resize(frame, (int(scale * width), int(scale * height)))
+# stacked image size for writing an image sequence
+width = 2560
+height = 800
 
-def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, cap_imgs = False):
+def resize(frame, dst_width):
+    width_ = frame.shape[1]
+    height_ = frame.shape[0]
+    scale = dst_width * 1.0 / width_
+    return cv2.resize(frame, (int(scale * width_), int(scale * height_)))
+
+def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, out_dir = "./", cap_video = False):
+
+    os.makedirs(out_dir, exist_ok=True)
+    if cap_video:
+    	# GStreamer command
+    	cmd = (
+	    "gst-launch-1.0 -q "
+	    "fdsrc ! "
+	    f"videoparse width={width} height={height} format=gray8 framerate=30/1 ! "
+	    "videoconvert ! "
+	    "x264enc tune=zerolatency speed-preset=ultrafast ! "
+	    "mp4mux ! "
+	    f"filesink location={out_dir}/video.mp4 sync=false"
+	)
+
+	# Start GStreamer process
+    	p = subprocess.Popen(cmd, stdin=subprocess.PIPE, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
     counter = 0
-    current_frame = 0;
+    current_frame = 0
     start_time = datetime.now()
     frame_count = 0
     start = time.time()
@@ -74,24 +100,35 @@ def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, cap_img
     		frame_0 = arducam_utils_0.convert(frame_0)
     		frame_1 = arducam_utils_1.convert(frame_1)
         
-    		frame_0 = resize(frame_0, 1280.0)
-    		frame_1 = resize(frame_1, 1280.0)
+    		frame_0_resize = resize(frame_0, 2560.0)
+    		frame_1_resize = resize(frame_1, 2560.0)
         	
         	# display
-        	#cv2.imshow("Arducam_0", frame_0)
-        	#cv2.imshow("Arducam_1", frame_1)
-    		stack_vert_frame = np.concatenate((frame_0, frame_1), axis=0)
-    		cv2.imshow("Arducam", stack_vert_frame)
+    		#stack_vert_frame = np.concatenate((frame_0, frame_1), axis=0)
+    		stack_vert_frame_resize = np.concatenate((frame_0_resize[:, :, 0], frame_1_resize[:, :, 0]), axis=0)
+    		#stack_vert_frame_resize = stack_vert_frame_resize[:, :, 0]
+    		cv2.imshow("Arducam", stack_vert_frame_resize)
     		cv2.waitKey(1)
+    		
+    		if cap_video:
+        	    assert stack_vert_frame_resize.shape == (height, width)
+        	    p.stdin.write(stack_vert_frame_resize.tobytes())
         	
     		if keyboard.is_pressed('g'):
-        	    img0_shot_name = "/home/jetsonlems/Arducam_Imgs/" + str(current_frame) + "_0.png"
-        	    cv2.imwrite(img0_shot_name, stack_vert_frame)
-        	    #img1_shot_name = "/home/jetsonlems/Arducam_Imgs/" + str(current_frame) + "_1.png"
-#        	    print("Taking screenshot of two quadroscopic cameras ...")
-#        	    cv2.imwrite(img0_shot_name, frame_0);
-#        	    cv2.imwrite(img1_shot_name, frame_1);
+        	    img_shot_name = out_dir + str(current_frame) + "_0.png"
+        	    cv2.imwrite(img_shot_name, stack_vert_frame_resize)
         	    current_frame += 1
+        	    
+    		if keyboard.is_pressed('q'):
+        	    end_time = datetime.now()
+        	    elapsed_time = end_time - start_time
+        	    avgtime = elapsed_time.total_seconds() / counter
+        	    print ("Average time between frames: " + str(avgtime))
+        	    print ("Average FPS: " + str(1/avgtime))
+        	    if cap_video:
+        	    	p.stdin.close()
+        	    	p.wait()
+        	    exit()
         	    
     		if fps and time.time() - start >= 1:
         	    if sys.version[0] == '2':
@@ -106,6 +143,9 @@ def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, cap_img
     	avgtime = elapsed_time.total_seconds() / counter
     	print ("Average time between frames: " + str(avgtime))
     	print ("Average FPS: " + str(1/avgtime))
+    	if cap_video:
+    		p.stdin.close()
+    		p.wait()
 
 
 def fourcc(a, b, c, d):
@@ -141,8 +181,10 @@ if __name__ == "__main__":
                         help="set width of image")
     parser.add_argument('--height', type=lambda x: int(x,0),
                         help="set height of image")
+    parser.add_argument('--output_dir', default="/home/jetsonlems/Arducam_Imgs/", type=str,
+                        help="specified output directory for images")
     parser.add_argument('--fps', action='store_true', help="display fps")
-    parser.add_argument('--cap', action='store_true', help="capture images")
+    parser.add_argument('--cap_video', action='store_true', help="capture a video")
     parser.add_argument('--channel', type=int, default=-1, nargs='?',
                         help="When using Camarray's single channel, use this parameter to switch channels. \
                             (E.g. ov9781/ov9281 Quadrascopic Camera Bundle Kit)")
@@ -166,8 +208,6 @@ if __name__ == "__main__":
     show_info(arducam_utils_0)
     show_info(arducam_utils_1)
     
-    print(arducam_utils_0.depth)
-    
     # turn off RGB conversion
     if arducam_utils_0.convert2rgb == 0:
         cap_0.set(cv2.CAP_PROP_CONVERT_RGB, arducam_utils_0.convert2rgb)
@@ -187,7 +227,7 @@ if __name__ == "__main__":
         arducam_utils_1.write_dev(ArducamUtils.CHANNEL_SWITCH_REG, args.channel)
 
     # begin display
-    display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, args.fps)
+    display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, args.fps, args.output_dir, args.cap_video)
 
     # release camera
     cap_0.release()
