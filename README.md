@@ -1,10 +1,13 @@
 # Multiple Arducam Camera System on a Jetson Orin
 Research @ LEMS, Brown University <br />
 
-This repository maintains the code of the experiments when working with multiple Arducam cameras on a Jetson Orin. Currently, a [Arducam Quadrascopic camera bundle kit](https://www.arducam.com/arducam-1mp4-quadrascopic-camera-bundle-kit-for-raspberry-pi-nvidia-jetson-nano-xavier-nx-four-ov9281-global-shutter-monochrome-camera-modules-and-camarray-camera-hat.html) (Arducam Jetvariety OV9281 cameras) is adopted to stream 4 synchronized HD images at 45 FPS to a Jetson Orin Nano, which can be extended to two quadrascopic cameras to stream 8 (almost synchronized) HD images at 45 FPS. 
+This repository is home to various code that works with multiple Arducam cameras on a Jetson Orin. Currently, a [Arducam Quadrascopic camera bundle kit](https://www.arducam.com/arducam-1mp4-quadrascopic-camera-bundle-kit-for-raspberry-pi-nvidia-jetson-nano-xavier-nx-four-ov9281-global-shutter-monochrome-camera-modules-and-camarray-camera-hat.html) (Arducam Jetvariety OV9281 cameras) is adopted to stream 4 synchronized HD images at 45 FPS to a Jetson Orin Nano, which can be extended to two quadrascopic cameras to stream 8 (almost synchronized) HD images at 45 FPS. 
 
 ## Streaming 8 images
 The python code `arducam_pair_displayer.py` demonstrates how eight images are read using two quadrascopic cameras connected to the two CSI-MIPI interfaces on the Jetson side. Pressing `g` with root previlege enables saving 8 images to a specified output directory.
+
+## Recording images
+Recording images is essential for downstream multi-camera applications, but data travelling for saving images drops the FPS. This can be resolved by opening multiple threads to enable parallel processing. A pilot experiment showed that streaming 4 images and recorded as one single video (cascaded images in a row), with specific timestamps for each image written in a file, achieves the original 45 FPS. Refer to the `recorder` folder for more information.
 
 ## Tasks applied to the captured images
 ### Detect and match SIFT features
@@ -14,6 +17,10 @@ The returned data of the pybind are the breakdown timings of each step required 
 
 The pybind function `popsift_match.match_multiple_pairs_from_arrays` connects the [`match_multiple_pairs_from_arrays`](https://github.com/C-H-Chien/multi_cam_jetson/blob/4eafd09b767966a75ea5a35a1e2e830135ac8aa9/popsift/src/application/py_match.cpp#L718)
 from [`py_match.cpp`](https://github.com/C-H-Chien/multi_cam_jetson/blob/main/popsift/src/application/py_match.cpp) which runs the SIFT keypoint extraction and matching on GPU.
+
+## Contributors
+Chiang-Heng Chien (chiang-heng\_chien@brown.edu) <br />
+Tangtangfang Fang (tangtangfang\_fang@brown.edu)
 
 ## Acknowledgement
 - Code for displaying images from Arducam cameras are based on [Arducam example code](https://github.com/ArduCAM/MIPI_Camera). <br />
