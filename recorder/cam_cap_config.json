@@ -1,0 +1,32 @@
+{
+  "camera": {
+    "device": 0,
+    "pixelformat": "GREY",
+    "width": 5120,
+    "height": 800,
+    "channel": -1,
+    "capture_buffersize": 8
+  },
+  "runtime": {
+    "show_display": false,
+    "fps_log": true,
+    "max_fps": null,
+    "sleep_sec_headless": 0.0005
+  },
+  "recording": {
+    "output_dir": "recordings",
+    "file_prefix": "wide",
+    "encoder_impl": "x264enc",
+    "gst_queue_max_buffers": 8,
+    "queue_size": 96,
+    "save_timestamps": true,
+    "container_fps": 30,
+    "bitrate": 12000,
+    "gop": 30,
+    "speed_preset": "ultrafast",
+    "tune": "zerolatency"
+  },
+  "system": {
+    "graceful_shutdown_timeout_sec": 20.0
+  }
+}
