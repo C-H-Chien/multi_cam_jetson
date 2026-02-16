@@ -13,17 +13,18 @@ docker build -t cam:dev .
 
 Run with Docker:
 ```bash
-sudo docker run --rm -it --privileged --device=/dev/video0 -v $PWD:/work -w /work cam:dev python3 $python_file_name$
+sudo docker run --rm -it --privileged --device=/dev/video0 -v $PWD:/work -w /work cam:dev python3 recorder/cam_cap.py --config cam_cap_config.json
 ```
 
-Run:
+Alternatively, you can also launch the docker first and then run:
 ```bash
 python cam_cap.py --config cam_cap_config.json
 ```
 
-packages:
-` opencv v4l2-fix numpy `
-
+Dependencies:
+- OpenCV
+- v4l2
+- Numpy
 
 ## cam_cap.json Configuration Options
 
