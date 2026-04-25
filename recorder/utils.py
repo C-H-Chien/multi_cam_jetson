@@ -81,6 +81,7 @@ class ArducamUtils(object):
     }
 
     pixfmt_map_raw8 = {
+        v4l2.V4L2_PIX_FMT_GREY:{ "depth":-1, "cvt_code": -1, "convert2rgb": 0},
         v4l2.V4L2_PIX_FMT_SBGGR8:{ "depth":8, "cvt_code": cv2.COLOR_BAYER_RG2BGR, "convert2rgb": 0},
         v4l2.V4L2_PIX_FMT_SGBRG8:{ "depth":8, "cvt_code": cv2.COLOR_BAYER_GR2BGR, "convert2rgb": 0},
         v4l2.V4L2_PIX_FMT_SGRBG8:{ "depth":8, "cvt_code": cv2.COLOR_BAYER_GB2BGR, "convert2rgb": 0},
@@ -169,6 +170,11 @@ class ArducamUtils(object):
             ArducamUtils.pixfmt_map = ArducamUtils.pixfmt_map_xavier_nx
         self.vd = open('/dev/video{}'.format(device_num), 'w')
         self.refresh()
+
+    def close(self):
+        if self.vd is not None:
+            self.vd.close()
+            self.vd = None
 
     def refresh(self):
         self.config = self.get_pixfmt_cfg()
