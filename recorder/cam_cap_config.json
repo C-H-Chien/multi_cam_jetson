@@ -1,12 +1,26 @@
 {
-  "camera": {
-    "device": 0,
-    "pixelformat": "GREY",
-    "width": 5120,
-    "height": 800,
-    "channel": -1,
-    "capture_buffersize": 8
-  },
+  "cameras": [
+    {
+      "id": "board0",
+      "enable": true,
+      "device": 0,
+      "pixelformat": "GREY",
+      "width": 5120,
+      "height": 800,
+      "channel": -1,
+      "capture_buffersize": 8
+    },
+    {
+      "id": "board1",
+      "enable": true,
+      "device": 1,
+      "pixelformat": "GREY",
+      "width": 5120,
+      "height": 800,
+      "channel": -1,
+      "capture_buffersize": 8
+    }
+  ],
   "runtime": {
     "show_display": false,
     "fps_log": true,
@@ -16,17 +30,27 @@
   "recording": {
     "output_dir": "recordings",
     "file_prefix": "wide",
-    "encoder_impl": "x264enc",
-    "gst_queue_max_buffers": 8,
-    "queue_size": 96,
+    "output_format": "mjpeg_mkv",
+    "gst_queue_max_buffers": 32,
+    "queue_size": 64,
     "save_timestamps": true,
     "container_fps": 30,
-    "bitrate": 12000,
-    "gop": 30,
-    "speed_preset": "ultrafast",
-    "tune": "zerolatency"
+    "h264": {
+      "encoder_impl": "x264enc",
+      "encoder_threads": 4,
+      "bitrate": 12000,
+      "gop": 30,
+      "speed_preset": "ultrafast",
+      "tune": "zerolatency"
+    },
+    "mjpeg": {
+      "jpeg_quality": 70
+    }
   },
   "system": {
-    "graceful_shutdown_timeout_sec": 20.0
+    "graceful_shutdown_timeout_sec": 20.0,
+    "board_startup_timeout_sec": 30.0,
+    "board_startup_delay_sec": 2.0,
+    "board_status_timeout_sec": 5.0
   }
 }
