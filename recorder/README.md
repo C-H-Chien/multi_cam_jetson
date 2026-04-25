@@ -16,7 +16,7 @@ Run with Docker:
 sudo docker run --rm -it --privileged --device=/dev/video0 -v $PWD:/work -w /work cam:dev python3 recorder/cam_cap.py --config cam_cap_config.json
 ```
 
-Alternatively, you can also launch the docker first and then run:
+Alternatively, you can also directly run:
 ```bash
 python cam_cap.py --config cam_cap_config.json
 ```
@@ -26,39 +26,122 @@ Dependencies:
 - v4l2
 - Numpy
 
+## Notes
+The frame rate in MKV containers has no practical meaning, frame metadata should be referenced from the CSV file.
+
 ## cam_cap.json Configuration Options
+```json
+{
+  "cameras": [
+    {
+      "id": "board0",
+      "enable": true,
+      "device": 0,  # /dev device
+      "pixelformat": "GREY",
+      "width": 5120,
+      "height": 800,
+      "channel": -1,
+      "capture_buffersize": 8
+    },
+    {
+      "id": "board1",
+      "enable": true,
+      "device": 1,  # /dev device
+      "pixelformat": "GREY",
+      "width": 5120,
+      "height": 800,
+      "channel": -1,
+      "capture_buffersize": 8
+    }
+  ],
+  "runtime": {
+    "show_display": false,  # Show live preview window while recording.
+    "fps_log": true,    # Print real-time FPS and queue/drop status in terminal.
+    "max_fps": null,    # Optional software capture-rate limit. Set to null to let the gray recording path run as fast as it can.
+    "sleep_sec_headless": 0.0005    # Small sleep interval in headless mode to reduce CPU busy-wait.
+  },
+  "recording": {
+    "output_dir": "recordings",
+    "file_prefix": "wide",
+    "output_format": "mjpeg_mkv",   # Required MKV output mode. Supported values are h264_mkv, h264_all_intra_mkv, and mjpeg_mkv.
+    "gst_queue_max_buffers": 32,
+    "queue_size": 64,
+    "save_timestamps": true,    
+    "container_fps": 30,    # FPS metadata written into video container; timing alignment should rely on timestamp metadata.
+    "h264": {   # Nested config used by h264_mkv and h264_all_intra_mkv
+      "encoder_impl": "x264enc",
+      "encoder_threads": 4,
+      "bitrate": 12000,
+      "gop": 30,
+      "speed_preset": "ultrafast",
+      "tune": "zerolatency"
+    },
+    "mjpeg": {  #  Nested config used by mjpeg_mkv
+      "jpeg_quality": 85
+    }
+  },
+  "system": {
+    "graceful_shutdown_timeout_sec": 20.0,
+    "board_startup_timeout_sec": 30.0,
+    "board_startup_delay_sec": 2.0,
+    "board_status_timeout_sec": 5.0
+  }
+}
 
-### camera
+```
 
-- **device**: V4L2 camera index. `0` means `/dev/video0`.
-- **pixelformat**: Input FourCC format string (3 or 4 chars), for example `GREY`.
-- **width**: Requested capture width in pixels.
-- **height**: Requested capture height in pixels.
-- **channel**: Optional camera channel switch index for multi-channel adapters. Use `-1` to disable channel switching.
-- **capture_buffersize**: OpenCV/V4L2 capture buffer count. Lower values reduce latency.
+## Output Layout
 
-### runtime
+Each run creates one session directory:
 
-- **show_display**: Show live preview window while recording.
-- **fps_log**: Print real-time FPS and queue/drop status in terminal.
-- **max_fps**: Optional software capture-rate limit. Use `null` to disable limiting.
-- **sleep_sec_headless**: Small sleep interval in headless mode to reduce CPU busy-wait.
+```text
+recordings/session_YYYYmmdd_HHMMSS/
+  session_info.json
+  board0_wide.mkv
+  board0_wide_timestamps.csv
+  board0_wide_info.json
+  board1_wide.mkv
+  board1_wide_timestamps.csv
+  board1_wide_info.json
+```
 
-### recording
+The recorder saves one wide video per sync board. Per-camera streams are generated after recording by the offline splitter.
 
-- **output_dir**: Directory for output files.
-- **file_prefix**: Prefix of generated output files.
-- **encoder_impl**: GStreamer encoder element name. Current default is `x264enc` (software encoding).
-- **gst_queue_max_buffers**: Max buffered frames in internal GStreamer queue. Use a small value (for example `4~16`) to prevent memory growth when encoder is slower than capture.
-- **queue_size**: Max frame queue size before dropping oldest frames.
-- **save_timestamps**: Whether to write per-frame timestamp CSV metadata.
-- **container_fps**: FPS metadata written into video container; timing alignment should rely on timestamp metadata.
-- **bitrate**: Encoder target bitrate in kbps for `x264enc`.
-- **gop**: Keyframe interval (Group of Pictures) in frames.
-- **speed_preset**: x264 speed preset (quality/CPU tradeoff), for example `ultrafast`.
-- **tune**: x264 tune profile, default `zerolatency`.
+Timestamp CSV rows use this schema:
 
-### system
+```text
+frame_id,capture_frame_id,timestamp_unix,timestamp_mono_ns,relative_time_sec
+```
 
-- **graceful_shutdown_timeout_sec**: Max seconds to wait for writer thread flush during shutdown.
+`frame_id` is the contiguous frame index actually written to the MKV. `capture_frame_id` is the
+contiguous index assigned immediately after a successful `cap.read()` in that board process, before
+reshape, validation, enqueue, or encode. `timestamp_unix` and `timestamp_mono_ns` are captured at
+that same point. Use `timestamp_mono_ns` first for cross-board alignment and use `capture_frame_id`
+gaps to locate capture frames that were later dropped by the writer queue.
 
+Board summary JSON and `session_info.json` record the actual `output_format` and effective encoder
+settings used by that session.
+
+## Offline Split
+
+Split a recorded session into per-camera streams:
+
+```bash
+python recorder/split_wide_video.py recordings/session_YYYYmmdd_HHMMSS
+```
+
+The default output directory is:
+
+```text
+recordings/session_YYYYmmdd_HHMMSS/split_streams/
+  cam0.mkv
+  cam0_timestamps.csv
+  cam0_info.json
+  ...
+  split_info.json
+```
+
+For an 8-camera session, `board0` maps to `cam0` through `cam3`, and `board1` maps to `cam4` through `cam7`.
+The splitter writes per-camera MKV files as single-channel gray streams and copies each board's
+timestamp CSV unchanged. By default it re-encodes split streams using the same `output_format` and
+`jpeg_quality` recorded in the source session metadata.
