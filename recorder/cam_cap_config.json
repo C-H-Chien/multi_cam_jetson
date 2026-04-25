@@ -44,7 +44,7 @@
       "tune": "zerolatency"
     },
     "mjpeg": {
-      "jpeg_quality": 85
+      "jpeg_quality": 70
     }
   },
   "system": {
