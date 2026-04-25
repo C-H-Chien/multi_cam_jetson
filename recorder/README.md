@@ -21,6 +21,12 @@ Alternatively, you can also directly run:
 python cam_cap.py --config cam_cap_config.json
 ```
 
+Split a recorded session into per-camera streams:
+
+```bash
+python split_wide_video.py your/recordings/path/session_YYYYmmdd_HHMMSS
+```
+
 Dependencies:
 - OpenCV
 - v4l2
