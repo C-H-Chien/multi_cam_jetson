@@ -1,5 +1,5 @@
-# $ sudo python3 ./arducam_pair_displayer.py -f GREY -d0 0 -d1 1 --fps
-# $ sudo python3 ./arducam_pair_displayer.py -f GREY -d0 0 -d1 1 --fps --cap_video
+# $ sudo python3 ./arducam_pair_displayer_video.py -f GREY -d0 0 -d1 1 --fps
+# $ sudo python3 ./arducam_pair_displayer_video.py -f GREY -d0 0 -d1 1 --fps --cap_video
 
 try:
     import cv2
@@ -58,7 +58,7 @@ def resize(frame, dst_width):
     scale = dst_width * 1.0 / width_
     return cv2.resize(frame, (int(scale * width_), int(scale * height_)))
 
-def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, out_dir = "./", cap_video = False):
+def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, device0_id, device1_id, fps = False, out_dir = "./", cap_video = False):
 
     os.makedirs(out_dir, exist_ok=True)
     if cap_video:
@@ -78,15 +78,26 @@ def display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, fps = False, out_dir
     
     counter = 0
     current_frame = 0
+    # Jetson powers the sensor only after STREAMON; exposure set before the first read() is lost.
+    exposure_time = 400
+    exposure_applied = False
+    
     start_time = datetime.now()
     frame_count = 0
     start = time.time()
     try:
-    	while True:    			
+    	while True:
+    			
     		ret_0, frame_0 = cap_0.read()
     		ret_1, frame_1 = cap_1.read()
     		counter += 1
     		frame_count += 1
+
+    		if not exposure_applied and ret_0 and ret_1:
+        	    # One-shot after stream is live; does not run again.
+        	    for dev in (device0_id, device1_id):
+        	    	os.system(f"v4l2-ctl -d {dev} -c exposure={exposure_time}")
+        	    	exposure_applied = True
 
     		if arducam_utils_0.convert2rgb == 0:
         	    w_0 = cap_0.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -181,7 +192,7 @@ if __name__ == "__main__":
                         help="set width of image")
     parser.add_argument('--height', type=lambda x: int(x,0),
                         help="set height of image")
-    parser.add_argument('--output_dir', default="/home/jetsonlems/Arducam_Imgs/", type=str,
+    parser.add_argument('--output_dir', default="/home/jetson-lems/Arducam_Imgs/", type=str,
                         help="specified output directory for images")
     parser.add_argument('--fps', action='store_true', help="display fps")
     parser.add_argument('--cap_video', action='store_true', help="capture a video")
@@ -227,7 +238,7 @@ if __name__ == "__main__":
         arducam_utils_1.write_dev(ArducamUtils.CHANNEL_SWITCH_REG, args.channel)
 
     # begin display
-    display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, args.fps, args.output_dir, args.cap_video)
+    display(cap_0, cap_1, arducam_utils_0, arducam_utils_1, args.device0, args.device1, args.fps, args.output_dir, args.cap_video)
 
     # release camera
     cap_0.release()
