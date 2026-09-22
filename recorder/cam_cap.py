@@ -618,6 +618,9 @@ def run_board_recorder_process(
     fps_alpha = 0.12
     last_fps_t = time.perf_counter()
     last_status_t = 0.0
+    
+    exposure_time = 400
+    exposure_applied = False
 
     put_status(status_queue, {"type": "status", "board_id": board_id, "status": "starting"})
 
@@ -684,6 +687,12 @@ def run_board_recorder_process(
             capture_frame_id = captured_frames
             recorder.enqueue(frame, capture_frame_id, ts_wall, ts_mono_ns)
             captured_frames += 1
+            
+            if not exposure_applied and ret:
+            	# One-shot after stream is live; does not run again.
+            	#for dev in (device0_id, device1_id):
+                os.system(f"v4l2-ctl -d {source.device} -c exposure={exposure_time}")
+                exposure_applied = True
 
             t = time.perf_counter()
             dt = t - last_fps_t
